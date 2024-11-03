@@ -27,6 +27,9 @@ public class BoomRunnable {
             headLocation.add(0, 1, 0);
         }
 
+
+        // culo
+
         ArmorStand armorStand = (ArmorStand) world.spawnEntity(headLocation, EntityType.ARMOR_STAND);
         armorStand.setVisible(false);
         armorStand.setGravity(false);
