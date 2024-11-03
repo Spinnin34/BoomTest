@@ -1,0 +1,8 @@
+name: BoomTest
+version: '1.2'
+main: p.boomTest.BoomTest
+api-version: '1.19'
+authors: [ Spinnin34 ]
+commands:
+  boomsystem:
+    usage: /boomsystem
