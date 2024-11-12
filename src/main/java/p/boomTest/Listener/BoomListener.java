@@ -1,68 +1,34 @@
 package p.boomTest.Listener;
 
-import org.apache.logging.log4j.util.Base64Util;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
-import org.bukkit.entity.TNTPrimed;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntitySpawnEvent;
-import org.bukkit.event.player.PlayerInteractEvent;
-import p.boomTest.BoomTest;
+import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.java.JavaPlugin;
 import p.boomTest.Manager.BoomManager;
-import p.boomTest.Runnable.BoomRunnable;
 
 public class BoomListener implements Listener {
 
     private final BoomManager boomManager;
-    private final BoomTest plugin;
+    private final JavaPlugin plugin;
 
-    public BoomListener(BoomManager boomManager, BoomTest plugin) {
+    public BoomListener(BoomManager boomManager, JavaPlugin plugin) {
         this.boomManager = boomManager;
         this.plugin = plugin;
     }
 
-    @EventHandler
-    public void onEntitySpawn(EntitySpawnEvent event) {
-        if (!boomManager.isSystemEnabled()) return;
-
-        if (event.getEntity() instanceof TNTPrimed) {
-            TNTPrimed tnt = (TNTPrimed) event.getEntity();
-            Player nearestPlayer = getNearestPlayer(tnt.getLocation());
-
-            if (nearestPlayer != null) {
-                new BoomRunnable(plugin).runBoomTask(tnt, nearestPlayer);
-            }
+    public void equipNearestPlayerWithTNTHelmet(Location location) {
+        Player nearestPlayer = getNearestPlayer(location);
+        if (nearestPlayer != null) {
+            equipPlayerWithTNTHelmet(nearestPlayer, location);
         }
-    }
-
-    @EventHandler
-    public void onPlayerInteract(PlayerInteractEvent event) {
-        if (!boomManager.isSystemEnabled()) return;
-
-        Block clickedBlock = event.getClickedBlock();
-        if (clickedBlock != null && clickedBlock.getType() == Material.LEVER) {
-            if (isTNTAdjacent(clickedBlock)) {
-                Player player = event.getPlayer();
-                TNTPrimed tnt = (TNTPrimed) player.getWorld().spawn(player.getLocation(), TNTPrimed.class);
-                new BoomRunnable(plugin).runBoomTask(tnt, player);
-            }
-        }
-    }
-
-    private boolean isTNTAdjacent(Block block) {
-        for (BlockFace face : BlockFace.values()) {
-            Block relativeBlock = block.getRelative(face);
-            if (relativeBlock.getType() == Material.TNT) {
-                relativeBlock.setType(Material.AIR);
-                return true;
-            }
-        }
-        return false;
     }
 
     private Player getNearestPlayer(Location location) {
@@ -77,5 +43,45 @@ public class BoomListener implements Listener {
             }
         }
         return closestPlayer;
+    }
+
+    private void equipPlayerWithTNTHelmet(Player player, Location explosionLocation) {
+        ItemStack originalHelmet = player.getInventory().getHelmet();
+        player.getInventory().setHelmet(new ItemStack(Material.TNT));
+        player.getWorld().createExplosion(player.getLocation(), 4.0f, false, false);
+        player.damage(10);
+
+        resetHelmet(player, originalHelmet);
+    }
+
+    private void resetHelmet(Player player, ItemStack originalHelmet) {
+        player.getInventory().setHelmet(originalHelmet);
+    }
+
+    private void removeNearbyTNT(Location location) {
+        for (int x = -1; x <= 1; x++) {
+            for (int y = -1; y <= 1; y++) {
+                for (int z = -1; z <= 1; z++) {
+                    Block block = location.clone().add(x, y, z).getBlock();
+                    if (block.getType() == Material.TNT) {
+                        block.setType(Material.AIR);
+                    }
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    public void onTNTExplosion(EntityExplodeEvent event) {
+        if (!boomManager.isSystemEnabled()) return;
+
+        Entity entity = event.getEntity();
+
+        if (entity.getType() == EntityType.PRIMED_TNT) {
+            Location explosionLocation = entity.getLocation();
+            event.setCancelled(true);
+            equipNearestPlayerWithTNTHelmet(explosionLocation);
+            removeNearbyTNT(explosionLocation);
+        }
     }
 }
